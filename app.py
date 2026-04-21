@@ -1,65 +1,48 @@
 # app.py
+# Emotion Music AI Pro - Version 4 Live Pro
+
 import streamlit as st
-from PIL import Image
+import cv2
+import av
 import numpy as np
-import pandas as pd
-import random
-from datetime import datetime
+from fer import FER
+from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration
 
-# -------------------------------------------------
+# ---------------------------------------------------
 # PAGE CONFIG
-# -------------------------------------------------
-st.set_page_config(
-    page_title="Emotion Music AI Pro",
-    page_icon="🎧",
-    layout="wide"
-)
+# ---------------------------------------------------
+st.set_page_config(page_title="Emotion Music AI Pro", page_icon="🎧", layout="wide")
 
-# -------------------------------------------------
-# CUSTOM CSS
-# -------------------------------------------------
+# ---------------------------------------------------
+# CSS
+# ---------------------------------------------------
 st.markdown("""
 <style>
-.main {
-    background: linear-gradient(135deg,#0f172a,#1e293b);
-    color: white;
-}
-.block-container {
-    padding-top: 2rem;
-}
-.title {
-    text-align:center;
-    font-size:42px;
-    font-weight:700;
-    color:#22c55e;
-}
-.subtitle {
-    text-align:center;
-    color:#cbd5e1;
-    margin-bottom:30px;
-}
-.card {
-    background:#111827;
-    padding:20px;
-    border-radius:18px;
-    box-shadow:0 0 12px rgba(0,0,0,0.25);
-}
-.small {
-    color:#94a3b8;
-    font-size:14px;
-}
+.main {background:#0f172a;color:white;}
+h1 {text-align:center;color:#22c55e;}
+.sidebar .sidebar-content {background:#111827;}
 </style>
 """, unsafe_allow_html=True)
 
-# -------------------------------------------------
-# HEADER
-# -------------------------------------------------
-st.markdown('<div class="title">🎧 Emotion Music AI Pro</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle">AI Powered Emotion + Personalized Music Recommendation</div>', unsafe_allow_html=True)
+st.title("🎧 Emotion Music AI Pro")
+st.write("Live Face Detection + Emotion Based Music Recommendation")
 
-# -------------------------------------------------
-# PLAYLIST DATABASE
-# -------------------------------------------------
+# ---------------------------------------------------
+# SIDEBAR
+# ---------------------------------------------------
+genre = st.sidebar.selectbox(
+    "🎵 Select Genre",
+    ["Pop", "Lo-fi", "Workout", "Romantic", "Bollywood", "Classical"]
+)
+
+language = st.sidebar.selectbox(
+    "🌍 Select Language",
+    ["English", "Hindi", "Punjabi", "Marathi"]
+)
+
+# ---------------------------------------------------
+# PLAYLISTS
+# ---------------------------------------------------
 playlists = {
     "happy": "37i9dQZF1DXdPec7aLTmlC",
     "sad": "37i9dQZF1DX7qK8ma5wgG1",
@@ -69,128 +52,107 @@ playlists = {
     "surprise": "37i9dQZF1DXa2PvUpywmrr"
 }
 
-# -------------------------------------------------
-# SESSION STATE
-# -------------------------------------------------
-if "history" not in st.session_state:
-    st.session_state.history = []
-
-# -------------------------------------------------
-# SIMPLE IMAGE-BASED MOOD DETECTION
-# -------------------------------------------------
-def detect_mood(img):
-    gray = np.array(img.convert("L"))
-    avg = gray.mean()
-
-    if avg > 180:
-        return "happy"
-    elif avg > 140:
-        return "neutral"
-    elif avg > 100:
-        return "sad"
-    else:
-        return "angry"
-
-# -------------------------------------------------
-# WELLNESS QUOTES
-# -------------------------------------------------
-quotes = {
-    "sad": "🌈 Tough times never last. Better days are coming.",
-    "angry": "🧘 Take a deep breath. Relax your mind.",
-    "happy": "✨ Keep smiling and enjoy the moment!",
-    "neutral": "🌿 Stay balanced and peaceful.",
-    "fear": "💪 You are stronger than your fears.",
-    "surprise": "🎉 Life is full of beautiful surprises!"
-}
-
-# -------------------------------------------------
-# SIDEBAR OPTIONS
-# -------------------------------------------------
-st.sidebar.header("🎛 Personal Preferences")
-
-genre = st.sidebar.selectbox(
-    "Select Genre",
-    ["Pop", "Lo-fi", "Romantic", "Workout", "Classical", "Bollywood"]
+# ---------------------------------------------------
+# FACE DETECTOR
+# ---------------------------------------------------
+faceCascade = cv2.CascadeClassifier(
+    cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
 )
 
-language = st.sidebar.selectbox(
-    "Select Language",
-    ["English", "Hindi", "Punjabi", "Marathi"]
+detector = FER(mtcnn=False)
+
+# ---------------------------------------------------
+# VIDEO PROCESSOR
+# ---------------------------------------------------
+class EmotionProcessor(VideoProcessorBase):
+
+    def recv(self, frame):
+        img = frame.to_ndarray(format="bgr24")
+
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+        faces = faceCascade.detectMultiScale(
+            gray,
+            scaleFactor=1.1,
+            minNeighbors=5,
+            minSize=(60, 60)
+        )
+
+        for (x, y, w, h) in faces:
+            # GREEN BOX
+            cv2.rectangle(img, (x, y), (x+w, y+h), (0,255,0), 2)
+
+            face = img[y:y+h, x:x+w]
+
+            try:
+                result = detector.top_emotion(face)
+
+                if result:
+                    emotion, score = result
+                    text = f"{emotion} ({score:.2f})"
+
+                    cv2.putText(
+                        img,
+                        text,
+                        (x, y-10),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.8,
+                        (0,255,0),
+                        2
+                    )
+
+                    st.session_state["emotion"] = emotion
+
+            except:
+                pass
+
+        if len(faces) == 0:
+            st.session_state["emotion"] = "No Face Detected"
+
+        return av.VideoFrame.from_ndarray(img, format="bgr24")
+
+# ---------------------------------------------------
+# LIVE CAMERA
+# ---------------------------------------------------
+st.subheader("📷 Live Webcam")
+
+ctx = webrtc_streamer(
+    key="emotion-ai",
+    video_processor_factory=EmotionProcessor,
+    rtc_configuration={
+        "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
+    },
+    media_stream_constraints={"video": True, "audio": False},
+    async_processing=True,
 )
 
-energy = st.sidebar.slider(
-    "Energy Level",
-    1, 10, 5
-)
+# ---------------------------------------------------
+# RESULT
+# ---------------------------------------------------
+emotion = st.session_state.get("emotion", "No Face Detected")
 
-# -------------------------------------------------
-# MAIN LAYOUT
-# -------------------------------------------------
-col1, col2 = st.columns([1,1])
+st.subheader("🎯 Detected Emotion")
+st.success(emotion)
 
-with col1:
-    st.markdown("### 📷 Capture Your Mood")
-    img = st.camera_input("Take a selfie")
+# ---------------------------------------------------
+# MUSIC
+# ---------------------------------------------------
+if emotion in playlists:
 
-with col2:
-    st.markdown("### 📌 Recommendation Details")
-    st.write(f"🎵 Genre: **{genre}**")
-    st.write(f"🌍 Language: **{language}**")
-    st.write(f"⚡ Energy Level: **{energy}/10**")
+    st.subheader("🎵 Recommended Music")
 
-# -------------------------------------------------
-# PROCESS IMAGE
-# -------------------------------------------------
-if img:
-    image = Image.open(img)
-    st.image(image, caption="Captured Image", use_container_width=True)
-
-    mood = detect_mood(image)
-
-    emoji = {
-        "happy":"😊",
-        "sad":"😢",
-        "neutral":"😐",
-        "angry":"😠"
-    }
-
-    # Save History
-    st.session_state.history.append(mood)
-
-    # Result Card
-    st.markdown("## 🎯 Mood Detection Result")
-    st.success(f"{emoji[mood]} Detected Mood: {mood.upper()}")
-
-    # Quote
-    st.info(quotes.get(mood, "Enjoy your music!"))
-
-    # Spotify Playlist
-    pid = playlists[mood]
-
-    st.markdown("## 🎵 Recommended Playlist")
+    pid = playlists[emotion]
 
     st.components.v1.iframe(
         f"https://open.spotify.com/embed/playlist/{pid}",
         height=420
     )
 
-# -------------------------------------------------
-# ANALYTICS
-# -------------------------------------------------
-if st.session_state.history:
-    st.markdown("## 📊 Mood Analytics Dashboard")
+else:
+    st.warning("Please face camera properly.")
 
-    df = pd.DataFrame(
-        st.session_state.history,
-        columns=["Mood"]
-    )
-
-    chart = df["Mood"].value_counts()
-
-    st.bar_chart(chart)
-
-# -------------------------------------------------
+# ---------------------------------------------------
 # FOOTER
-# -------------------------------------------------
+# ---------------------------------------------------
 st.markdown("---")
 st.caption("Developed by Prem | Final Year B.Tech Project")
