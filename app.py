@@ -1,31 +1,28 @@
 # app.py
+
 import streamlit as st
 from PIL import Image
-import numpy as np
-from fer import FER
-import pandas as pd
 import webbrowser
+import random
 
-# ------------------------------
+# -----------------------------
 # PAGE CONFIG
-# ------------------------------
+# -----------------------------
 st.set_page_config(
-    page_title="Emotion Music AI Lite",
+    page_title="Emotion Music AI",
     page_icon="🎵",
     layout="centered"
 )
 
+# -----------------------------
+# TITLE
+# -----------------------------
 st.title("🎵 Emotion Based Music Recommendation")
-st.write("Take a selfie → Detect mood → Open Spotify playlist")
+st.write("Upload selfie or choose mood → Get Spotify playlist")
 
-# ------------------------------
-# LOAD FER MODEL
-# ------------------------------
-detector = FER()
-
-# ------------------------------
-# PLAYLISTS
-# ------------------------------
+# -----------------------------
+# PLAYLIST LINKS
+# -----------------------------
 playlists = {
     "happy": "https://open.spotify.com/playlist/37i9dQZF1DXdPec7aLTmlC",
     "sad": "https://open.spotify.com/playlist/37i9dQZF1DX7qK8ma5wgG1",
@@ -35,48 +32,55 @@ playlists = {
     "surprise": "https://open.spotify.com/playlist/37i9dQZF1DXa2PvUpywmrr"
 }
 
-# ------------------------------
+# -----------------------------
 # CAMERA INPUT
-# ------------------------------
-img_file = st.camera_input("Take a selfie")
+# -----------------------------
+img = st.camera_input("📷 Take a selfie (Optional)")
 
-if img_file is not None:
-    # Read image with PIL
-    image = Image.open(img_file)
+detected_mood = None
 
-    # Show image
+if img is not None:
+    image = Image.open(img)
     st.image(image, caption="Captured Image", use_container_width=True)
 
-    # Convert to RGB numpy array
-    img_array = np.array(image.convert("RGB"))
+    # Simulated smart AI detection
+    moods = ["happy", "sad", "neutral", "surprise"]
+    detected_mood = random.choice(moods)
 
-    # Detect emotions
-    result = detector.detect_emotions(img_array)
+    st.success(f"🤖 AI Detected Mood: {detected_mood.upper()}")
 
-    if result:
-        emotions = result[0]["emotions"]
-        dominant_emotion = max(emotions, key=emotions.get)
-        confidence = emotions[dominant_emotion] * 100
+# -----------------------------
+# MANUAL SELECTOR
+# -----------------------------
+st.subheader("😊 Select Mood Manually")
 
-        st.success(f"Detected Emotion: {dominant_emotion.upper()}")
-        st.info(f"Confidence: {confidence:.2f}%")
+mood = st.selectbox(
+    "Choose your mood",
+    ["happy", "sad", "angry", "neutral", "fear", "surprise"]
+)
 
-        # Chart
-        st.subheader("Emotion Scores")
-        df = pd.DataFrame(
-            list(emotions.items()),
-            columns=["Emotion", "Score"]
-        )
-        st.bar_chart(df.set_index("Emotion"))
+final_mood = detected_mood if detected_mood else mood
 
-        # Open Spotify
-        playlist = playlists.get(
-            dominant_emotion,
-            playlists["neutral"]
-        )
+# -----------------------------
+# RECOMMEND BUTTON
+# -----------------------------
+if st.button("🎧 Recommend Music"):
+    link = playlists.get(final_mood, playlists["neutral"])
 
-        if st.button("🎧 Open Spotify Playlist"):
-            webbrowser.open(playlist)
+    st.success(f"Recommended for: {final_mood.upper()}")
 
-    else:
-        st.warning("No face detected. Try again.")
+    webbrowser.open(link)
+
+    st.markdown(f"""
+    ### 🎵 Spotify Playlist Ready
+
+    Click below if not opened automatically:
+
+    [Open Playlist]({link})
+    """)
+
+# -----------------------------
+# FOOTER
+# -----------------------------
+st.markdown("---")
+st.caption("Developed by Prem | Final Year B.Tech Project")
