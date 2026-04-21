@@ -1,116 +1,85 @@
 # app.py
+# Emotion Music AI Pro - Version 5 Final Year Premium
+
 import streamlit as st
+import sqlite3
+import pandas as pd
+from datetime import datetime
 from PIL import Image
 import numpy as np
-import pandas as pd
 import random
-from datetime import datetime
 
-# -------------------------------------------------
+# ---------------------------------------------------
 # PAGE CONFIG
-# -------------------------------------------------
+# ---------------------------------------------------
 st.set_page_config(
-    page_title="Emotion Music AI Pro",
+    page_title="Emotion Music AI Premium",
     page_icon="🎧",
     layout="wide"
 )
 
-# -------------------------------------------------
+# ---------------------------------------------------
 # CUSTOM CSS
-# -------------------------------------------------
+# ---------------------------------------------------
 st.markdown("""
 <style>
 .main {
-    background: linear-gradient(135deg,#0f172a,#1e293b);
+    background: linear-gradient(135deg,#0f172a,#111827);
     color: white;
 }
 .block-container {
     padding-top: 2rem;
 }
-.title {
+h1 {
     text-align:center;
-    font-size:42px;
-    font-weight:700;
     color:#22c55e;
 }
-.subtitle {
-    text-align:center;
-    color:#cbd5e1;
-    margin-bottom:30px;
-}
 .card {
-    background:#111827;
+    background:#1f2937;
     padding:20px;
     border-radius:18px;
-    box-shadow:0 0 12px rgba(0,0,0,0.25);
-}
-.small {
-    color:#94a3b8;
-    font-size:14px;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# -------------------------------------------------
-# HEADER
-# -------------------------------------------------
-st.markdown('<div class="title">🎧 Emotion Music AI Pro</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle">AI Powered Emotion + Personalized Music Recommendation</div>', unsafe_allow_html=True)
+st.title("🎧 Emotion Music AI Premium")
+st.write("AI Based Emotion Recognition + Personalized Music Therapy System")
 
-# -------------------------------------------------
-# PLAYLIST DATABASE
-# -------------------------------------------------
+# ---------------------------------------------------
+# DATABASE
+# ---------------------------------------------------
+conn = sqlite3.connect("emotion_data.db", check_same_thread=False)
+cursor = conn.cursor()
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS history (
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+date TEXT,
+emotion TEXT,
+genre TEXT,
+language TEXT
+)
+""")
+conn.commit()
+
+# ---------------------------------------------------
+# PLAYLISTS
+# ---------------------------------------------------
 playlists = {
     "happy": "37i9dQZF1DXdPec7aLTmlC",
     "sad": "37i9dQZF1DX7qK8ma5wgG1",
     "neutral": "37i9dQZF1DX2sUQwD7tbmL",
-    "angry": "37i9dQZF1DWYNSmSSRFIWg",
-    "fear": "37i9dQZF1DX4fpCWaHOned",
-    "surprise": "37i9dQZF1DXa2PvUpywmrr"
+    "angry": "37i9dQZF1DWYNSmSSRFIWg"
 }
 
-# -------------------------------------------------
-# SESSION STATE
-# -------------------------------------------------
-if "history" not in st.session_state:
-    st.session_state.history = []
-
-# -------------------------------------------------
-# SIMPLE IMAGE-BASED MOOD DETECTION
-# -------------------------------------------------
-def detect_mood(img):
-    gray = np.array(img.convert("L"))
-    avg = gray.mean()
-
-    if avg > 180:
-        return "happy"
-    elif avg > 140:
-        return "neutral"
-    elif avg > 100:
-        return "sad"
-    else:
-        return "angry"
-
-# -------------------------------------------------
-# WELLNESS QUOTES
-# -------------------------------------------------
-quotes = {
-    "sad": "🌈 Tough times never last. Better days are coming.",
-    "angry": "🧘 Take a deep breath. Relax your mind.",
-    "happy": "✨ Keep smiling and enjoy the moment!",
-    "neutral": "🌿 Stay balanced and peaceful.",
-    "fear": "💪 You are stronger than your fears.",
-    "surprise": "🎉 Life is full of beautiful surprises!"
-}
-
-# -------------------------------------------------
-# SIDEBAR OPTIONS
-# -------------------------------------------------
-st.sidebar.header("🎛 Personal Preferences")
+# ---------------------------------------------------
+# SIDEBAR
+# ---------------------------------------------------
+st.sidebar.header("🎛 Personalization")
 
 genre = st.sidebar.selectbox(
     "Select Genre",
-    ["Pop", "Lo-fi", "Romantic", "Workout", "Classical", "Bollywood"]
+    ["Pop", "Lo-fi", "Workout", "Bollywood", "Romantic", "Classical"]
 )
 
 language = st.sidebar.selectbox(
@@ -118,79 +87,139 @@ language = st.sidebar.selectbox(
     ["English", "Hindi", "Punjabi", "Marathi"]
 )
 
-energy = st.sidebar.slider(
-    "Energy Level",
-    1, 10, 5
+# ---------------------------------------------------
+# SIMPLE MOOD DETECTION
+# ---------------------------------------------------
+def detect_emotion(image):
+    gray = np.array(image.convert("L"))
+    avg = gray.mean()
+
+    if avg > 180:
+        return "happy"
+    elif avg > 130:
+        return "neutral"
+    elif avg > 90:
+        return "sad"
+    else:
+        return "angry"
+
+# ---------------------------------------------------
+# QUOTES
+# ---------------------------------------------------
+quotes = {
+    "happy": "✨ Keep smiling and spread positivity.",
+    "sad": "🌈 Better days are coming.",
+    "neutral": "🌿 Stay calm and balanced.",
+    "angry": "🧘 Relax. Take a deep breath."
+}
+
+# ---------------------------------------------------
+# MAIN TABS
+# ---------------------------------------------------
+tab1, tab2, tab3 = st.tabs(
+    ["🎥 Live Detection", "📊 Dashboard", "ℹ About Project"]
 )
 
-# -------------------------------------------------
-# MAIN LAYOUT
-# -------------------------------------------------
-col1, col2 = st.columns([1,1])
+# ---------------------------------------------------
+# TAB 1
+# ---------------------------------------------------
+with tab1:
 
-with col1:
-    st.markdown("### 📷 Capture Your Mood")
+    st.subheader("📷 Camera Input")
+
     img = st.camera_input("Take a selfie")
 
-with col2:
-    st.markdown("### 📌 Recommendation Details")
-    st.write(f"🎵 Genre: **{genre}**")
-    st.write(f"🌍 Language: **{language}**")
-    st.write(f"⚡ Energy Level: **{energy}/10**")
+    if img:
 
-# -------------------------------------------------
-# PROCESS IMAGE
-# -------------------------------------------------
-if img:
-    image = Image.open(img)
-    st.image(image, caption="Captured Image", use_container_width=True)
+        image = Image.open(img)
+        st.image(image, width=350)
 
-    mood = detect_mood(image)
+        emotion = detect_emotion(image)
 
-    emoji = {
-        "happy":"😊",
-        "sad":"😢",
-        "neutral":"😐",
-        "angry":"😠"
-    }
+        st.success(f"Detected Mood: {emotion.upper()}")
 
-    # Save History
-    st.session_state.history.append(mood)
+        st.info(quotes[emotion])
 
-    # Result Card
-    st.markdown("## 🎯 Mood Detection Result")
-    st.success(f"{emoji[mood]} Detected Mood: {mood.upper()}")
+        # Save to DB
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # Quote
-    st.info(quotes.get(mood, "Enjoy your music!"))
+        cursor.execute(
+            "INSERT INTO history(date,emotion,genre,language) VALUES (?,?,?,?)",
+            (now, emotion, genre, language)
+        )
+        conn.commit()
 
-    # Spotify Playlist
-    pid = playlists[mood]
+        # Spotify
+        st.subheader("🎵 Recommended Playlist")
 
-    st.markdown("## 🎵 Recommended Playlist")
+        pid = playlists[emotion]
 
-    st.components.v1.iframe(
-        f"https://open.spotify.com/embed/playlist/{pid}",
-        height=420
-    )
+        st.components.v1.iframe(
+            f"https://open.spotify.com/embed/playlist/{pid}",
+            height=420
+        )
 
-# -------------------------------------------------
-# ANALYTICS
-# -------------------------------------------------
-if st.session_state.history:
-    st.markdown("## 📊 Mood Analytics Dashboard")
+# ---------------------------------------------------
+# TAB 2
+# ---------------------------------------------------
+with tab2:
 
-    df = pd.DataFrame(
-        st.session_state.history,
-        columns=["Mood"]
-    )
+    st.subheader("📊 Mood Analytics")
 
-    chart = df["Mood"].value_counts()
+    df = pd.read_sql_query("SELECT * FROM history", conn)
 
-    st.bar_chart(chart)
+    if len(df) > 0:
 
-# -------------------------------------------------
+        st.write("### Recent Records")
+        st.dataframe(df.tail(10), use_container_width=True)
+
+        st.write("### Emotion Count")
+        st.bar_chart(df["emotion"].value_counts())
+
+        st.write("### Language Preference")
+        st.bar_chart(df["language"].value_counts())
+
+        st.write("### Genre Preference")
+        st.bar_chart(df["genre"].value_counts())
+
+    else:
+        st.warning("No data available yet.")
+
+# ---------------------------------------------------
+# TAB 3
+# ---------------------------------------------------
+with tab3:
+
+    st.subheader("🎓 Final Year Project Details")
+
+    st.markdown("""
+### Project Title:
+AI Based Emotion Recognition and Personalized Music Therapy System
+
+### Technologies Used:
+- Python
+- Streamlit
+- SQLite
+- NumPy
+- Pandas
+- Spotify Embed API
+
+### Modules:
+1. Camera Input  
+2. Emotion Detection  
+3. Recommendation Engine  
+4. Database Logging  
+5. Analytics Dashboard
+
+### Future Scope:
+- Real Face Detection AI
+- Deep Learning Model
+- Voice Emotion Detection
+- Mobile App Deployment
+""")
+
+# ---------------------------------------------------
 # FOOTER
-# -------------------------------------------------
+# ---------------------------------------------------
 st.markdown("---")
 st.caption("Developed by Prem | Final Year B.Tech Project")
